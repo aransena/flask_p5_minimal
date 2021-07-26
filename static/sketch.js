@@ -1,9 +1,9 @@
 let r, g, b;
 let w, h;
-let x, y, rad;
+let x, y, radius;
 
 function setup() {
-  frameRate(30);
+  frameRate(120);
   h = windowHeight
   w = windowWidth
   createCanvas(w, h);
@@ -17,10 +17,10 @@ function draw() {
   strokeWeight(2);
   stroke(r, g, b);
   fill(r, g, b, 127);
-  rad = 100*sin(frameCount/30)
+  radius = 200+100*sin(frameCount/30)
   x = w/2;
   y = h/2;
-  ellipse(x, y, rad, rad);
+  ellipse(x, y, radius, radius);
   let w_new = windowWidth
   let h_new = windowHeight
   if(w_new != w || h_new != h){
@@ -33,7 +33,7 @@ function draw() {
 
 function mousePressed() {
   let d = dist(mouseX, mouseY, x, y);
-  if (d < rad) {
+  if (d < radius) {
     r = random(255);
     g = random(255);
     b = random(255);
