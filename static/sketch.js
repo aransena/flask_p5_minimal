@@ -3,6 +3,7 @@ let w, h;
 let x, y, radius;
 
 function setup() {
+
   frameRate(120);
   h = windowHeight
   w = windowWidth
@@ -10,6 +11,8 @@ function setup() {
   r = random(255);
   g = random(255);
   b = random(255);
+
+  console.log("Setup")
 }
 
 function draw() {
