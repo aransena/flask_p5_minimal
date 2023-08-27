@@ -1,5 +1,5 @@
 # flask_p5_minimal
-Minimal example project for hosting p5 sketches locally with python (flask)
+Minimal example project for hosting p5 sketches locally with python (flask). This branch includes a websocket backend to demonstrate transferring data to/from the p5.js frontend, and persisting state data across connected clients.
 
 https://p5js.org/
 
