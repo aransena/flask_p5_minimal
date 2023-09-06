@@ -29,7 +29,7 @@ class WebsocketServer:
         self.websocket_thread = threading.Thread(target=self.websocket_thread)
         self.state_thread = threading.Thread(target=self.state_thread)
         self.lock = threading.RLock()
-        self.tick_rate = 0.0001 # for example application
+        self.tick_rate = 0.001 # for example application
         self.run()
     
     def run(self):
@@ -47,7 +47,7 @@ class WebsocketServer:
     def state_thread(self):
         self.state_update()
 
-    def update_state(self, curr_tick):
+    def update_state(self):
         delta = 0.01
         self.state_x = (self.target_x - self.state_x)*delta + self.state_x
         self.state_y = (self.target_y - self.state_y)*delta + self.state_y
@@ -67,7 +67,7 @@ class WebsocketServer:
             if curr_tick > self.tick_in_newest:
                 self.target_x = self.target_x_in
                 self.target_y = self.target_y_in
-                self.update_state(curr_tick)
+                
                 self.tick_in_newest = self.tick
             
 
@@ -102,6 +102,7 @@ class WebsocketServer:
             print("Ticking example")
             while True:
                 self.tick += 0.1
+                self.update_state()
                 time.sleep(self.tick_rate)
                 # print(f"{self.tick:0.3f}", end="\r")
         except KeyboardInterrupt as e:
