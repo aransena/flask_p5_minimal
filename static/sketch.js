@@ -11,7 +11,8 @@ let target_x;
 let target_y;
 let state_x;
 let state_y;
-
+let socket;
+let window_scale_factor = 0.9965;
 
 function messageReceived(msg) {
   // Callback function that receives data from remote websocket server
@@ -34,15 +35,20 @@ function setup() {
   
   hostname = document.getElementsByName('userscript')[0].getAttribute('host_name');
   ws_url = "ws://"+hostname+":"+port;
-  console.log(port);
-  connectWebsocket(ws_url);
-  sendMessage({
-    "msg": "Setup success"
-  });
+  socket = io.connect();//ws_url, {transports:['websocket']});
+  socket.on('connect', function(){socket.emit('client_connected', {data: 'I\'m connected!'})});
+  socket.on('server_message', messageReceived);
+  socket.emit('client_connected', {data: 'Test!'})
+  
+  // console.log(ws_url);
+  // connectWebsocket(ws_url);
+  // sendMessage({
+  //   "msg": "Setup success"
+  // });
   counter = 0;
   frameRate(120);
-  h = windowHeight;
-  w = windowWidth;
+  h = windowHeight*window_scale_factor;
+  w = windowWidth*window_scale_factor;
   state_x = w/2;
   state_y = h/2;
   target_x = w/2;
@@ -57,7 +63,7 @@ function setup() {
 }
 
 function draw() {
-  background(127);
+  background(255);
 
   stroke(r, g, b);
   fill(r, g, b, 127);
@@ -67,14 +73,17 @@ function draw() {
   
   // Send data back to remote websocket server
   try {
-    
-    sendMessage({
-      "data": counter,
-      "msg": "Counter value",
-      "tick": tick,
-    });
+    message = {
+        "data": counter,
+        "msg": "Counter value",
+        "tick": tick,
+      }
+    // console.log("Sending: " + String(message));
+    socket.emit("client_message", message)
+    // sendMessage();
   } catch (error) {
-    connectWebsocket(ws_url);
+    console.log(error);
+    // connectWebsocket(ws_url, options={echo: false, receiver: false, controller: false});
   }
   
   // Simple example for this code
@@ -92,8 +101,8 @@ function draw() {
   }
 
   // Check for window resize  
-  let w_new = windowWidth
-  let h_new = windowHeight
+  let w_new = windowWidth*window_scale_factor;
+  let h_new = windowHeight*window_scale_factor;
   if(w_new != w || h_new != h){
     w = w_new;
     h = h_new;
@@ -102,6 +111,14 @@ function draw() {
     
 }
 
+function windowResized() {
+  const css = getComputedStyle(canvas.parentElement),
+        marginWidth = round(float(css.marginLeft) + float(css.marginRight)),
+        marginHeight = round(float(css.marginTop) + float(css.marginBottom)),
+        w = windowWidth - marginWidth, h = windowHeight - marginHeight;
+
+  resizeCanvas(w, h, true);
+}
 
 
 function mousePressed() {
@@ -109,7 +126,16 @@ function mousePressed() {
   target_y = mouseY;
   // Send data back to remote websocket server
   try {
-    sendMessage({
+    // sendMessage({
+    //   "data": counter,
+    //   "msg": "Counter value",
+    //   "tick": tick,
+    //   "state_x": state_x/w,
+    //   "state_y": state_y/h,
+    //   "target_x": target_x/w,
+    //   "target_y": target_y/h
+    // });
+    message = {
       "data": counter,
       "msg": "Counter value",
       "tick": tick,
@@ -117,7 +143,10 @@ function mousePressed() {
       "state_y": state_y/h,
       "target_x": target_x/w,
       "target_y": target_y/h
-    });
+      }
+    console.log("Sending: " + String(message));
+    socket.emit("client_message", message)
+
   } catch (error) {
     connectWebsocket(ws_url);
   }

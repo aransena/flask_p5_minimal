@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 
 import asyncio
-from websockets.server import serve
+# from websockets.server import servefrom
 import threading
 import json
 import math
 from flask import Flask, render_template, request
+from flask_socketio import SocketIO
 import time
+from queue import Queue
+
 
 class WebsocketServer:
-    def __init__(self) -> None:
+    def __init__(self, in_queue, out_queue) -> None:
         self.tick = 0.
         self.state_x = 0.
         self.state_y = 0.
@@ -26,6 +29,8 @@ class WebsocketServer:
         self.state = None
         self.ws = None
         self.port = None
+        self.in_queue = in_queue
+        self.out_queue = out_queue
         self.websocket_thread = threading.Thread(target=self.websocket_thread)
         self.state_thread = threading.Thread(target=self.state_thread)
         self.lock = threading.RLock()
@@ -42,7 +47,12 @@ class WebsocketServer:
         
 
     def websocket_thread(self):
-        asyncio.run(self.start_websocket())
+#        asyncio.run(self.start_websocket())
+        print("Websocket server waiting on messages")
+        while True:
+            msg = self.in_queue.get()
+            self.out_queue.put(self.process_message(msg))
+		
 
     def state_thread(self):
         self.state_update()
@@ -52,50 +62,55 @@ class WebsocketServer:
         self.state_x = (self.target_x - self.state_x)*delta + self.state_x
         self.state_y = (self.target_y - self.state_y)*delta + self.state_y
 
-    async def process_message(self, websocket):
-        async for message in websocket:
-            msg_in = json.loads(message)
-            try:
-                self.tick_in = msg_in["tick"]
-                self.state_x_in = msg_in["state_x"]
-                self.state_y_in = msg_in["state_y"]
-                self.target_x_in = msg_in["target_x"]
-                self.target_y_in = msg_in["target_y"]
-            except:
-                pass
-            curr_tick = self.tick
-            if curr_tick > self.tick_in_newest:
-                self.target_x = self.target_x_in
-                self.target_y = self.target_y_in
-                
-                self.tick_in_newest = self.tick
+    #async def process_message(self, websocket):
+    def process_message(self, message):
+#        async for message in websocket:
+        # print(message)
+        msg_in = message
+        # msg_in = json.loads(message)
+        # print(msg_in)
+        try:
+            self.tick_in = msg_in["tick"]
+            self.state_x_in = msg_in["state_x"]
+            self.state_y_in = msg_in["state_y"]
+            self.target_x_in = msg_in["target_x"]
+            self.target_y_in = msg_in["target_y"]
+        except:
+            pass
+        curr_tick = self.tick
+        if curr_tick > self.tick_in_newest:
+            self.target_x = self.target_x_in
+            self.target_y = self.target_y_in
             
+            self.tick_in_newest = self.tick
+        
 
-            msg_out = {}            
+        msg_out = {}            
 
-            self.update_state
-            
-            msg_out["tick"] = self.tick
-            msg_out["state_x"] = self.state_x
-            msg_out["state_y"] = self.state_y
-            msg_out["target_x"] = self.target_x
-            msg_out["target_y"] = self.target_y
-            await websocket.send(json.dumps(msg_out))
+        # self.update_state
+        
+        msg_out["tick"] = self.tick
+        msg_out["state_x"] = self.state_x
+        msg_out["state_y"] = self.state_y
+        msg_out["target_x"] = self.target_x
+        msg_out["target_y"] = self.target_y
+        return msg_out
+        # await websocket.send(json.dumps(msg_out))
     
-    async def start_websocket(self):
-        print("Websocket backend waiting")
-        with self.lock:
-            for i in range(8001,30000):
-                try:
-                    async with serve(self.process_message, "0.0.0.0", i):
-                        self.port = i
-                        print(f"Starting server messaging using port {self.port}")
-                        await asyncio.Future()  # run forever
-                except Exception as e:
-                    print(e)
-                    pass
+    # async def start_websocket(self):
+    #     print("Websocket backend waiting")
+    #     with self.lock:
+    #         for i in range(79,100000):
+    #             try:
+    #                 async with serve(self.process_message, "0.0.0.0", i):
+    #                     self.port = i
+    #                     print(f"Starting server messaging using port {self.port}")
+    #                     await asyncio.Future()  # run forever
+    #             except Exception as e:
+    #                 print(e)
+    #                 pass
             
-        print("Websocket server ended")
+    #     print("Websocket server ended")
 
     def state_update(self):
         try:
@@ -109,28 +124,45 @@ class WebsocketServer:
             pass
 
 app = Flask(__name__)
+socketio = SocketIO(app)
+
+@socketio.on('client_message')
+def message_event(data):
+    
+    global inbound_queue, outbound_queue
+    # while True:
+    
+    inbound_queue.put(data)
+    socketio.emit("server_message", outbound_queue.get())
+
+@socketio.on('client_connected')
+def connected_event(data):
+    print(data)
 
 @app.route('/')
 def home(name=None):
         global port
         hostname = request.headers.get('Host').split(":")[0]
         print(f"HOST: {hostname}")
+        print(f"CLIENT: {request.remote_addr}")
         return render_template('index.html', name=name, hostname=hostname, port=port)
 
 if __name__=="__main__":
-    global port
+    global port, inbound_queue, outbound_queue
     port = None
     print("Starting websocket backend")
-    ws_server = WebsocketServer()
+    inbound_queue = Queue()
+    outbound_queue = Queue()
+    ws_server = WebsocketServer(inbound_queue, outbound_queue)
 
-    while port is None:
-        port = ws_server.port
-    print(f"USING: {port}")
+    # while port is None:
+    #     port = ws_server.port
+    # print(f"USING: {port}")
+    port=80
 
+    print("Starting")
+    # app.run(debug=True, host="0.0.0.0", port=port)
+    socketio.run(app, host="0.0.0.0", port=80)
     
-    app.run(debug=True, host="0.0.0.0", port=8000)
-    
-   
-
     ws_server.join()
     print("Exit")
