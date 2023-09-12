@@ -31,8 +31,8 @@ class WebsocketServer:
         self.port = None
         self.in_queue = in_queue
         self.out_queue = out_queue
-        self.websocket_thread = threading.Thread(target=self.websocket_thread)
-        self.state_thread = threading.Thread(target=self.state_thread)
+        self.websocket_thread = threading.Thread(target=self.websocket_worker)
+        self.state_thread = threading.Thread(target=self.state_worker)
         self.lock = threading.RLock()
         self.tick_rate = 0.001 # for example application
         self.run()
@@ -46,7 +46,7 @@ class WebsocketServer:
         self.websocket_thread.join()        
         
 
-    def websocket_thread(self):
+    def websocket_worker(self):
 #        asyncio.run(self.start_websocket())
         print("Websocket server waiting on messages")
         while True:
@@ -54,7 +54,7 @@ class WebsocketServer:
             self.out_queue.put(self.process_message(msg))
 		
 
-    def state_thread(self):
+    def state_worker(self):
         self.state_update()
 
     def update_state(self):
@@ -131,13 +131,18 @@ def message_event(data):
     
     global inbound_queue, outbound_queue
     # while True:
-    
+    print(request.remote_addr, "received:", data)
     inbound_queue.put(data)
-    socketio.emit("server_message", outbound_queue.get())
+    msg_out = outbound_queue.get()
+    print(request.remote_addr, "sending: ", msg_out)
+    socketio.emit("server_message", msg_out)
 
 @socketio.on('client_connected')
 def connected_event(data):
-    print(data)
+    global ws_server
+    print(f"{request.remote_addr}\t{data}")
+    # socketio.emit("server_message",{'tick':ws_server.tick})
+
 
 @app.route('/')
 def home(name=None):
@@ -148,7 +153,7 @@ def home(name=None):
         return render_template('index.html', name=name, hostname=hostname, port=port)
 
 if __name__=="__main__":
-    global port, inbound_queue, outbound_queue
+    global port, inbound_queue, outbound_queue, ws_server
     port = None
     print("Starting websocket backend")
     inbound_queue = Queue()
@@ -162,7 +167,7 @@ if __name__=="__main__":
 
     print("Starting")
     # app.run(debug=True, host="0.0.0.0", port=port)
-    socketio.run(app, host="0.0.0.0", port=80)
+    socketio.run(app, host="0.0.0.0", port=4000)
     
     ws_server.join()
     print("Exit")

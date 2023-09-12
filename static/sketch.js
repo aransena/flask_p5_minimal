@@ -12,11 +12,13 @@ let target_y;
 let state_x;
 let state_y;
 let socket;
+let ready;
 let window_scale_factor = 0.9965;
 
 function messageReceived(msg) {
   // Callback function that receives data from remote websocket server
   message = msg;
+  console.log(msg);
   let new_tick = message['tick'];
   if(new_tick > tick){
     tick = new_tick;
@@ -28,17 +30,28 @@ function messageReceived(msg) {
 }
 
 function setup() {
-  
+  ready=false;
   message = null;
   tick = 0.0;
   port = document.getElementsByName('userscript')[0].getAttribute('port_value');
   
   hostname = document.getElementsByName('userscript')[0].getAttribute('host_name');
-  ws_url = "ws://"+hostname+":"+port;
-  socket = io.connect();//ws_url, {transports:['websocket']});
-  socket.on('connect', function(){socket.emit('client_connected', {data: 'I\'m connected!'})});
+  ws_url = "http://"+hostname+":"+port;
+  // socket.io.opts.transports=["websocket", "polling"];
+  socket = io();
+  
+  socket.on('connect', function(){console.log("connecting..."); ready=true; socket.emit('client_connected', {data: 'I\'m connected!'})});
   socket.on('server_message', messageReceived);
-  socket.emit('client_connected', {data: 'Test!'})
+  while(!ready){
+    try{
+      socket.emit('client_connected', {data: 'Hello!'});
+      ready=true;
+    }
+    catch{
+      console.log("waiting for connection...");
+    }
+  }
+  
   
   // console.log(ws_url);
   // connectWebsocket(ws_url);
@@ -63,6 +76,7 @@ function setup() {
 }
 
 function draw() {
+  text(String(socket), 100, 100);
   background(255);
 
   stroke(r, g, b);
@@ -148,7 +162,7 @@ function mousePressed() {
     socket.emit("client_message", message)
 
   } catch (error) {
-    connectWebsocket(ws_url);
+    // connectWebsocket(ws_url);
   }
 
 }
